@@ -1,15 +1,56 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component } from 'react';
 import './App.css';
-import { API, Storage } from 'aws-amplify';
+import Amplify, { API, Storage, Auth } from 'aws-amplify';
 import { withAuthenticator, AmplifySignOut } from '@aws-amplify/ui-react';
 import { listNotes } from './graphql/queries';
 import { createNote as createNoteMutation, deleteNote as deleteNoteMutation } from './graphql/mutations';
+import awsconfig from './aws-exports';
+
+Amplify.configure(awsconfig);
 
 const initialFormState = { name: '', description: '' }
 
 function App() {
   const [notes, setNotes] = useState([]);
   const [formData, setFormData] = useState(initialFormState);
+
+async function addToGroup() { 
+  let apiName = 'AdminQueries';
+  let path = '/addUserToGroup';
+  let myInit = {
+      body: {
+        "username" : "elf",
+        "groupname": "clubadmin"
+      }, 
+      headers: {
+        'Content-Type' : 'application/json',
+        Authorization: `${(await Auth.currentSession()).getAccessToken().getJwtToken()}`
+      } 
+  }
+  return await API.post(apiName, path, myInit);
+}
+
+
+let nextToken;
+
+async function listEditors(limit){
+  let apiName = 'AdminQueries';
+  let path = '/listUsersInGroup';
+  let myInit = { 
+      queryStringParameters: {
+        "groupname": "clubadmin",
+        "limit": limit,
+        "token": nextToken
+      },
+      headers: {
+        'Content-Type' : 'application/json',
+        Authorization: `${(await Auth.currentSession()).getAccessToken().getJwtToken()}`
+      }
+  }
+  const { NextToken, ...rest } =  await API.get(apiName, path, myInit);
+  nextToken = NextToken;
+  return rest;
+}
 
   useEffect(() => {
     fetchNotes();
@@ -85,6 +126,8 @@ function App() {
 		  ))
 		}
       </div>
+	  <button onClick={addToGroup}>Add to Group</button>
+      <button onClick={() => listEditors(10)}>List Editors</button>
       <AmplifySignOut />
     </div>
   );
